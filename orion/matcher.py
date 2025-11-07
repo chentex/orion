@@ -250,6 +250,7 @@ class Matcher:
         self, uuid: str,
         uuids: List[str],
         metrics: Dict[str, Any],
+        exists_fields: List[str] = None,
         timestamp_field: str = "timestamp"
     ) -> Dict[Any, Any]:
         """
@@ -259,6 +260,7 @@ class Matcher:
             uuid (str): _description_
             uuids (list): _description_
             metrics (dict): _description_
+            exists_fields (list): list of fields that need to exist in the document
             timestamp_field (str): timestamp field in data
 
         Returns:
@@ -276,12 +278,20 @@ class Matcher:
             for metric_key, metric_value in metrics.items()
             if metric_key not in ["name", "metric_of_interest", "not"]
         ]
+        exists_queries = []
+        if exists_fields:
+            exists_queries = [
+                Q("exists", **{"field": field})
+                for field in exists_fields
+            ]
+        exist_query = Q("bool", must=exists_queries)
         metric_query = Q("bool", must=metric_queries + not_queries)
         query = Q(
             "bool",
             must=[
                 Q("terms", **{self.uuid_field+".keyword": uuids}),
-                metric_query
+                metric_query,
+                exist_query
             ],
         )
         search = (
