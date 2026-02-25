@@ -1,0 +1,16 @@
+name: Hold PR
+
+on:
+  pull_request:
+    types: opened
+    branches:
+      - main
+
+jobs:
+  label-hold:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply hold label
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: do-not-merge/hold
