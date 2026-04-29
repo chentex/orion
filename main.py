@@ -23,6 +23,7 @@ from orion.visualization import generate_test_html
 from orion.reporting.standalone import load_json_files, generate_report
 from orion.reporting.summary import print_regression_summary
 from orion.ack_providers import AckProvider, FileAckProvider, JiraAckProvider
+from orion.profiler import QueryProfiler, ProfiledConnection
 from version import __version__
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request.*")
@@ -472,6 +473,7 @@ def get_ack_providers(kwargs: dict, config: dict, logger) -> tuple[list[AckProvi
 @click.option("--display", type=List(), default=["buildUrl"], help="Add metadata field as a column in the output (e.g. ocpVirt, upstreamJob)")
 @click.option("--pr-analysis", is_flag=True, help="Analyze PRs for regressions", default=False)
 @click.option("--viz", is_flag=True, default=False, help="Generate interactive HTML visualizations alongside output")
+@click.option("--profile", is_flag=True, default=False, help="Enable ES query profiling. Writes timing report to <save-output-path>-profile.json")
 @click.option(
     "--report",
     default=None,
@@ -505,6 +507,13 @@ def main(**kwargs):
 
     # Load config first (needed for auto-detection)
     kwargs["config"] = load_config(kwargs["config"], kwargs["input_vars"])
+
+    if kwargs.get("profile"):
+        profiler = QueryProfiler()
+        kwargs["profiler"] = profiler
+        kwargs["connection_class"] = ProfiledConnection
+    else:
+        kwargs["profiler"] = None
 
     # Validate --jira-auto-create requires --jira-ack
     if kwargs.get("jira_auto_create") and not kwargs.get("jira_ack"):
@@ -619,6 +628,12 @@ def main(**kwargs):
                     generate_test_html(viz_data, output_file)
         except Exception as e:  # pylint: disable=broad-except
             logger.warning("Visualization generation failed: %s", e)
+
+    if kwargs.get("profile") and kwargs.get("profiler"):
+        profile_path = f"{os.path.splitext(kwargs['save_output_path'])[0]}-profile.json"
+        with open(profile_path, 'w', encoding="utf-8") as f:
+            f.write(kwargs["profiler"].to_json())
+        logger.info("Profile report written to %s", profile_path)
 
     if has_regression:
         sys.exit(2) ## regression detected

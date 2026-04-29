@@ -212,7 +212,9 @@ def analyze(test, kwargs, is_pull = False) -> AnalyzeResult:
         es_server=kwargs["es_server"],
         verify_certs=False,
         version_field=test["version_field"],
-        uuid_field=test["uuid_field"]
+        uuid_field=test["uuid_field"],
+        profiler=kwargs.get("profiler"),
+        connection_class=kwargs.get("connection_class"),
     )
     utils = Utils(test["uuid_field"], test["version_field"])
     logger = SingletonLogger.get_logger("Orion")
