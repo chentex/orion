@@ -2,11 +2,13 @@
 
 import json
 import threading
-import time  # pylint: disable=unused-import  # needed by future instrumentation hooks
+import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Optional
+
+from opensearchpy.connection import RequestsHttpConnection
 
 
 @dataclass
@@ -146,3 +148,61 @@ class NoOpProfiler:
     def to_json(self):
         """Return empty JSON object."""
         return "{}"
+
+
+class ProfiledConnection(RequestsHttpConnection):
+    """RequestsHttpConnection subclass that records query timing via a profiler."""
+
+    def __init__(self, **kwargs):
+        self.profiler = kwargs.pop("profiler", None) or NoOpProfiler()
+        super().__init__(**kwargs)
+
+    def perform_request(  # pylint: disable=too-many-arguments
+        self,
+        method,
+        url,
+        params=None,
+        body=None,
+        timeout=None,
+        allow_redirects=True,
+        ignore=(),
+        headers=None,
+    ):
+        """Execute the request, capturing timing data for the profiler."""
+        request_path = url
+        query_body_bytes = len(body) if body else 0
+        http_status = 0
+        response_bytes = 0
+        result = None
+
+        start = time.perf_counter()
+        try:
+            result = super().perform_request(
+                method,
+                url,
+                params=params,
+                body=body,
+                timeout=timeout,
+                allow_redirects=allow_redirects,
+                ignore=ignore,
+                headers=headers,
+            )
+            http_status = result[0]
+            response_bytes = len(result[2]) if result[2] else 0
+        finally:
+            elapsed_ms = (time.perf_counter() - start) * 1000.0
+            connect_time_ms = 0.0
+            self.profiler.record(
+                wall_time_ms=elapsed_ms,
+                connect_time_ms=connect_time_ms,
+                tls_time_ms=0.0,
+                ttfb_ms=0.0,
+                transfer_time_ms=0.0,
+                response_bytes=response_bytes,
+                query_body_bytes=query_body_bytes,
+                request_path=request_path,
+                http_status=http_status,
+                is_pooled_connection=connect_time_ms == 0.0,
+            )
+
+        return result

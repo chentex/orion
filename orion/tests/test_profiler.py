@@ -2,8 +2,9 @@
 
 import json
 import threading
+from unittest.mock import MagicMock, patch
 
-from orion.profiler import NoOpProfiler, QueryProfiler, QueryRecord
+from orion.profiler import NoOpProfiler, ProfiledConnection, QueryProfiler, QueryRecord
 
 
 class TestQueryRecord:  # pylint: disable=too-few-public-methods
@@ -210,3 +211,75 @@ class TestNoOpProfiler:  # pylint: disable=too-few-public-methods
             is_pooled_connection=False,
         )
         assert profiler.to_json() == "{}"
+
+
+class TestProfiledConnection:
+    """Tests for the ProfiledConnection wrapper around RequestsHttpConnection."""
+
+    def _make_connection(self, profiler=None):
+        """Create a ProfiledConnection with mocked internals (no real HTTP)."""
+        with patch.object(ProfiledConnection, "__init__", lambda self, **kw: None):
+            conn = ProfiledConnection()
+        conn.profiler = profiler or QueryProfiler()
+        conn.base_url = "https://localhost:9200"
+        conn.session = MagicMock()
+        conn.timeout = 30
+        conn.http_compress = False
+        conn.http_auth = None
+        conn.hostname = "localhost"
+        conn.metrics = MagicMock()
+        return conn
+
+    def test_profiled_connection_records_timing(self):
+        """perform_request records a QueryRecord with correct fields."""
+        profiler = QueryProfiler()
+        conn = self._make_connection(profiler)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b'{"hits":{"hits":[]}}'
+        mock_response.headers = {}
+
+        conn.session.send.return_value = mock_response
+        conn.session.prepare_request.return_value = MagicMock()
+        conn.session.merge_environment_settings.return_value = {}
+
+        status, _headers, _data = conn.perform_request("GET", "/_search", body=b'{"query":{}}')
+
+        assert status == 200
+        records = profiler.records
+        assert len(records) == 1
+
+        rec = records[0]
+        assert rec.request_path == "/_search"
+        assert rec.http_status == 200
+        assert rec.wall_time_ms > 0
+        assert rec.query_body_bytes == len(b'{"query":{}}')
+        assert rec.response_bytes == len(b'{"hits":{"hits":[]}}')
+        assert rec.connect_time_ms == 0.0
+        assert rec.tls_time_ms == 0.0
+        assert rec.ttfb_ms == 0.0
+        assert rec.transfer_time_ms == 0.0
+        assert rec.is_pooled_connection is True
+
+    def test_profiled_connection_handles_errors_gracefully(self):
+        """On ConnectionError, profiler still records with http_status=0."""
+        profiler = QueryProfiler()
+        conn = self._make_connection(profiler)
+
+        conn.session.send.side_effect = ConnectionError("connection refused")
+        conn.session.prepare_request.return_value = MagicMock()
+        conn.session.merge_environment_settings.return_value = {}
+
+        try:
+            conn.perform_request("GET", "/_search")
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+        records = profiler.records
+        assert len(records) == 1
+
+        rec = records[0]
+        assert rec.http_status == 0
+        assert rec.wall_time_ms > 0
+        assert rec.request_path == "/_search"
