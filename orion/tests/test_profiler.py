@@ -1,9 +1,12 @@
 """Tests for orion.profiler module."""
 
 import json
+import logging
 import threading
 from unittest.mock import MagicMock, patch
 
+from orion.logger import SingletonLogger
+from orion.matcher import Matcher
 from orion.profiler import NoOpProfiler, ProfiledConnection, QueryProfiler, QueryRecord
 
 
@@ -283,3 +286,63 @@ class TestProfiledConnection:
         assert rec.http_status == 0
         assert rec.wall_time_ms > 0
         assert rec.request_path == "/_search"
+
+
+class TestMatcherProfilerIntegration:
+    """Tests for Matcher integration with the profiler."""
+
+    def test_matcher_accepts_profiler_param(self):
+        """Matcher stores profiler when explicitly passed."""
+        profiler = QueryProfiler()
+        with patch("orion.matcher.OpenSearch"):
+            SingletonLogger(debug=logging.INFO, name="Orion")
+            matcher = Matcher(index="test-index", profiler=profiler)
+            assert matcher.profiler is profiler
+
+    def test_matcher_defaults_to_noop_profiler(self):
+        """Matcher uses NoOpProfiler when no profiler is given."""
+        with patch("orion.matcher.OpenSearch"):
+            SingletonLogger(debug=logging.INFO, name="Orion")
+            matcher = Matcher(index="test-index")
+            assert isinstance(matcher.profiler, NoOpProfiler)
+
+    def test_matcher_accepts_connection_class(self):
+        """Matcher passes connection_class and profiler to OpenSearch kwargs."""
+        profiler = QueryProfiler()
+        with patch("orion.matcher.OpenSearch") as mock_es:
+            SingletonLogger(debug=logging.INFO, name="Orion")
+            Matcher(
+                index="test-index",
+                profiler=profiler,
+                connection_class=ProfiledConnection,
+            )
+            call_kwargs = mock_es.call_args[1]
+            assert call_kwargs.get("connection_class") == ProfiledConnection
+
+    def test_matcher_sets_profiler_context_on_get_results(self):
+        """get_results calls set_context before executing the query."""
+        profiler = QueryProfiler()
+        with patch("orion.matcher.OpenSearch"):
+            SingletonLogger(debug=logging.INFO, name="Orion")
+            matcher = Matcher(index="test-index", profiler=profiler)
+
+        fake_hits = [
+            MagicMock(**{"to_dict.return_value": {
+                "_source": {"uuid": "uuid1", "metricName": "cpuUsage",
+                             "value": 42, "timestamp": "2026-01-01T00:00:00"}
+            }})
+        ]
+        with patch.object(matcher, "query_index", return_value=fake_hits):
+            matcher.get_results(
+                "", ["uuid1"],
+                {"name": "cpuUsage", "metricName": "cpuUsage",
+                 "metric_of_interest": "value"},
+                timestamp_field="timestamp"
+            )
+        # set_context was called -- pending_context was set.
+        # Since no ProfiledConnection, record() was never called by transport,
+        # so pending_context remains with the values from set_context.
+        # pylint: disable=protected-access
+        assert profiler._pending_context.get("query_type") == "get_results"
+        assert profiler._pending_context.get("metric_name") == "cpuUsage"
+        assert profiler._pending_context.get("uuid_count") == 1

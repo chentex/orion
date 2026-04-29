@@ -10,6 +10,7 @@ import pandas as pd
 from opensearchpy import OpenSearch
 from opensearch_dsl import Search, Q
 from orion.logger import SingletonLogger
+from orion.profiler import NoOpProfiler
 
 
 class Matcher:
@@ -31,18 +32,27 @@ class Matcher:
         es_server: str = "https://localhost:9200",
         verify_certs: bool = True,
         version_field: str = "ocpVersion",
-        uuid_field: str = "uuid"
+        uuid_field: str = "uuid",
+        profiler=None,
+        connection_class=None
     ):
         self.index = index
         self.search_size = 10000
         self.logger = SingletonLogger.get_logger("Orion")
-        self.es = OpenSearch(es_server,
-                             timeout=30,
-                             verify_certs=verify_certs,
-                             http_compress=True,
-                             max_retries=3,
-                             retry_on_timeout=True,
-                             pool_maxsize=5)
+        self.profiler = profiler or NoOpProfiler()
+        es_kwargs = {
+            "timeout": 30,
+            "verify_certs": verify_certs,
+            "http_compress": True,
+            "max_retries": 3,
+            "retry_on_timeout": True,
+            "pool_maxsize": 5,
+        }
+        if connection_class:
+            es_kwargs["connection_class"] = connection_class
+            if profiler:
+                es_kwargs["profiler"] = profiler
+        self.es = OpenSearch(es_server, **es_kwargs)
         self.version_field = version_field
         self.uuid_field = uuid_field
 
@@ -57,6 +67,11 @@ class Matcher:
         """
         query = Q("match",  **{self.uuid_field: f"{uuid}"})
         result = {}
+        self.profiler.set_context(
+            query_type="get_metadata_by_uuid",
+            uuid_count=1,
+            index=self.index,
+        )
         s = Search(using=self.es, index=self.index).query(query)
         res = self.query_index(s)
         hits = res.hits.hits
@@ -171,6 +186,11 @@ class Matcher:
             .sort({timestamp_field: {"order": "desc"}})
             .extra(size=lookback_size)
         )
+        self.profiler.set_context(
+            query_type="get_uuid_by_metadata",
+            uuid_count=0,
+            index=self.index,
+        )
         all_hits = self.query_index(s, return_all=True)
         uuids_docs = []
         for hit in all_hits:
@@ -222,6 +242,11 @@ class Matcher:
             .query(query)
             .extra(size=self.search_size)
             .sort({timestamp_field: {"order": "desc"}})
+        )
+        self.profiler.set_context(
+            query_type="match_kube_burner",
+            uuid_count=len(uuids),
+            index=self.index,
         )
         all_hits = self.query_index(search, return_all=True)
         runs = [hit.to_dict()["_source"] for hit in all_hits]
@@ -299,6 +324,12 @@ class Matcher:
             .extra(size=self.search_size)
             .sort({timestamp_field: {"order": "desc"}})
         )
+        self.profiler.set_context(
+            query_type="get_results",
+            metric_name=metrics.get("name"),
+            uuid_count=len(uuids),
+            index=self.index,
+        )
         all_hits = self.query_index(search, return_all=True)
         runs = [hit.to_dict()["_source"] for hit in all_hits]
         return runs
@@ -359,6 +390,13 @@ class Matcher:
         else:
             # Standard aggregations (sum, avg, max, min)
             uuid_bucket.metric(metric_of_interest, agg_type, field=metrics["metric_of_interest"])
+        self.profiler.set_context(
+            query_type="get_agg_metric_query",
+            metric_name=metrics.get("name"),
+            agg_type=metrics["agg"]["agg_type"],
+            uuid_count=len(uuids),
+            index=self.index,
+        )
         result = search.execute()
         self.logger.info("Executing aggregated query for metric %s against index %s",
             metrics["name"], self.index)
