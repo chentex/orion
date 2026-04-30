@@ -84,7 +84,6 @@ class QueryProfiler:
                 is_pooled_connection=timing["is_pooled_connection"],
             )
             self._records.append(rec)
-            self._pending_context = {}
 
     def to_json(self):
         """Generate a full JSON profiling report."""

@@ -193,6 +193,29 @@ class TestQueryProfiler:
         assert rec.query_type == "unknown"
         assert rec.metric_name is None
 
+    def test_query_profiler_context_persists_across_pagination(self):
+        """set_context before multiple record() calls: all records keep the context."""
+        profiler = QueryProfiler()
+        profiler.set_context(query_type="get_results", metric_name="podLatency", uuid_count=5, index="idx")
+
+        for _ in range(3):
+            profiler.record(**self._make_timing())
+
+        for rec in profiler.records:
+            assert rec.query_type == "get_results"
+            assert rec.metric_name == "podLatency"
+
+    def test_query_profiler_set_context_overrides_previous(self):
+        """A new set_context replaces the previous one."""
+        profiler = QueryProfiler()
+        profiler.set_context(query_type="get_results", metric_name="cpu", index="idx")
+        profiler.record(**self._make_timing())
+        profiler.set_context(query_type="get_agg_metric_query", metric_name="mem", index="idx2")
+        profiler.record(**self._make_timing())
+
+        assert profiler.records[0].query_type == "get_results"
+        assert profiler.records[1].query_type == "get_agg_metric_query"
+
 
 class TestNoOpProfiler:  # pylint: disable=too-few-public-methods
     """Tests for the NoOpProfiler class."""
