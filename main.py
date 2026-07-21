@@ -420,7 +420,7 @@ def get_ack_providers(kwargs: dict, config: dict, logger) -> tuple[list[AckProvi
     is_flag=True,
     help="Generate percent difference in comparison",
     cls=MutuallyExclusiveOption,
-    mutually_exclusive=["anomaly_detection","hunter_analyze"],
+    mutually_exclusive=["anomaly_detection","hunter_analyze","orig_analyze"],
 )
 @click.option("--filter", is_flag=True, help="Generate percent difference in comparison")
 @click.option(
@@ -452,11 +452,18 @@ def get_ack_providers(kwargs: dict, config: dict, logger) -> tuple[list[AckProvi
 @click.option("--sippy-pr-search", is_flag=True, help="Search for PRs in sippy")
 @click.option("--debug", default=False, is_flag=True, help="log level")
 @click.option(
+    "--orig-analyze",
+    is_flag=True,
+    help="run original e-divisive analysis from apache-otava",
+    cls=MutuallyExclusiveOption,
+    mutually_exclusive=["anomaly_detection","hunter_analyze","cmr"],
+)
+@click.option(
     "--hunter-analyze",
     is_flag=True,
     help="run hunter analyze",
     cls=MutuallyExclusiveOption,
-    mutually_exclusive=["anomaly_detection","cmr"],
+    mutually_exclusive=["anomaly_detection","cmr","orig_analyze"],
 )
 @click.option("--anomaly-window", type=int, callback=validate_anomaly_options, help="set window size for moving average for anomaly-detection")
 @click.option("--min-anomaly-percent", type=int, callback=validate_anomaly_options, help="set minimum percentage difference from moving average for data point to be detected as anomaly")
@@ -465,7 +472,7 @@ def get_ack_providers(kwargs: dict, config: dict, logger) -> tuple[list[AckProvi
     is_flag=True,
     help="run anomaly detection algorithm powered by isolation forest",
     cls=MutuallyExclusiveOption,
-    mutually_exclusive=["hunter_analyze","cmr"],
+    mutually_exclusive=["hunter_analyze","cmr","orig_analyze"],
 )
 @click.option(
     "-o",
