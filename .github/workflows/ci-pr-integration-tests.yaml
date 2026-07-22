@@ -46,8 +46,15 @@ jobs:
 
             core.setFailed('Timeout waiting for CI tests');
 
-  integration_tests:
+  approve:
     needs: gate
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    steps:
+      - run: echo "Approved for integration testing"
+
+  integration_tests:
+    needs: approve
     uses: ./.github/workflows/tests.yaml
     with:
       checkout_ref: ${{ github.event.pull_request.head.sha }}

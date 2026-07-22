@@ -4,12 +4,12 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from otava.series import AnalysisOptions
-from otava.analysis import TTestStats
 import orion.constants as cnsts
 from orion.algorithms.edivisive.edivisive import EDivisive
 from orion.algorithms.edivisive.origEdivisive import OrigEDivisive
 from orion.algorithms.algorithmFactory import AlgorithmFactory
 from orion.run_test import get_algorithm_type
+from orion.tests.conftest import make_change_point
 
 
 def test_orig_edivisive_options_has_orig_flag():
@@ -70,18 +70,8 @@ def _make_changepoint_without_metric(index, mean_1=100.0, mean_2=200.0):
     The original E-Divisive algorithm in otava can return ChangePoint
     objects that lack the .metric attribute (see GitHub issue #433).
     """
-    return SimpleNamespace(
-        index=index,
-        qhat=0.0,
-        time=0,
-        stats=TTestStats(
-            mean_1=mean_1,
-            mean_2=mean_2,
-            std_1=0.0,
-            std_2=0.0,
-            pvalue=1.0,
-        ),
-    )
+    cp = make_change_point("_placeholder", index, mean_1, mean_2)
+    return SimpleNamespace(index=cp.index, qhat=cp.qhat, time=cp.time, stats=cp.stats)
 
 
 def test_is_acked_without_metric_attribute():

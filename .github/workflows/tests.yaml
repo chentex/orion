@@ -35,6 +35,7 @@ jobs:
         repository: ${{ inputs.checkout_repo || github.repository }}
         ref: ${{ inputs.checkout_ref || github.sha }}
         persist-credentials: false
+        allow-unsafe-pr-checkout: true
 
     - name: Install dependencies
       run: |
