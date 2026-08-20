@@ -189,6 +189,20 @@ class TestJsonFormatter:
             for metric_data in record["metrics"].values():
                 assert metric_data["percentage_change"] == 0
 
+    def test_format_sets_per_metric_is_changepoint(self):
+        data = _make_analysis_result()
+        formatter = JsonFormatter()
+        result = formatter.format(data)
+        parsed = json.loads(result["test-workload"])
+
+        cp_record = [r for r in parsed if r["is_changepoint"]][0]
+        assert cp_record["metrics"]["cpu"]["is_changepoint"] is True
+
+        non_cp = [r for r in parsed if not r["is_changepoint"]]
+        for record in non_cp:
+            for metric_data in record["metrics"].values():
+                assert metric_data["is_changepoint"] is False
+
     def test_format_collapse_returns_context_only(self):
         data = _make_analysis_result()
         data.collapse = True

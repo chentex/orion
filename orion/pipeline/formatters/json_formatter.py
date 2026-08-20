@@ -22,6 +22,7 @@ class JsonFormatter(BaseFormatter):
                 key: {
                     "value": entry.pop(key),
                     "percentage_change": 0,
+                    "is_changepoint": False,
                     "labels": value["labels"] if value["labels"] else [],
                 }
                 for key, value in data.metrics_config.items()
@@ -41,6 +42,9 @@ class JsonFormatter(BaseFormatter):
                 dataframe_json[index]["metrics"][key][
                     "percentage_change"
                 ] = percentage_change
+                dataframe_json[index]["metrics"][key][
+                    "is_changepoint"
+                ] = True
                 dataframe_json[index]["is_changepoint"] = True
                 if cp_idx < len(confidences):
                     dataframe_json[index]["metrics"][key][

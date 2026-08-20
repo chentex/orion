@@ -384,7 +384,10 @@ def analyze(test, kwargs, is_pull=False):
         avg_values = final_algorithm.dataframe[metrics].mean()
 
     confidence_by_metric = compute_confidence(
-        algorithm_name, final_algorithm.dataframe, change_points_by_metric
+        algorithm_name,
+        final_algorithm.original_dataframe,
+        change_points_by_metric,
+        raw_change_points_by_metric=final_algorithm.raw_change_points_by_metric,
     )
 
     analysis_result = AnalysisResult(

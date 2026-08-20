@@ -80,7 +80,7 @@ def extract_regression_data(workload: str, data: list[dict]) -> list[dict]:
 
         metrics_with_change = []
         for name, info in entry.get("metrics", {}).items():
-            if info.get("percentage_change", 0) != 0:
+            if info.get("is_changepoint", info.get("percentage_change", 0) != 0):
                 entry_dict = {
                     "name": name,
                     "value": info.get("value"),

@@ -37,6 +37,7 @@ class CMR(Algorithm):
             series.data = self.dataframe
             return series, {}
         # if larger than 2 rows, need to get the mean of 0 through -2
+        self._original_dataframe = self.dataframe.copy()
         self.dataframe = self.combine_and_average_runs(self.dataframe)
 
         series= self.setup_series()

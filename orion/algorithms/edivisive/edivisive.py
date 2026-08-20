@@ -43,6 +43,10 @@ class EDivisive(Algorithm):
             logger.info("ACKed UUIDs: %s", ", ".join(acked_uuids))
             self._acked_logged = True
 
+        self.raw_change_points_by_metric = {
+            metric: list(cps) for metric, cps in change_points_by_metric.items()
+        }
+
         # filter by direction and ack'ed issues
         for metric, changepoint_list in change_points_by_metric.items():
             for i in range(len(changepoint_list)-1, -1, -1):

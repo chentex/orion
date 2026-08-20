@@ -29,14 +29,14 @@ class TestMapLabel:
     def test_negligible_shift(self):
         assert _map_label(0.01, 0.1) == "Negligible shift (d=0.10, p=0.01)"
 
-    def test_large_d_high_p_not_significant(self):
+    def test_large_d_high_p_still_large_shift(self):
         label = _map_label(0.3, 1.5)
-        assert label == "Large shift (d=1.50, p=0.3) — Not statistically significant"
+        assert label == "Large shift (d=1.50, p=0.3)"
 
     def test_boundary_p_value_at_005(self):
         label = _map_label(0.05, 1.0)
-        assert "Not statistically significant" in label
         assert "Large shift" in label
+        assert "p=0.05" in label
 
     def test_boundary_cohens_d_at_08(self):
         assert _map_label(0.01, 0.8) == "Large shift (d=0.80, p=0.01)"
@@ -339,3 +339,49 @@ class TestComputeConfidence:
         result = compute_confidence(cnsts.EDIVISIVE, df, cps)
         assert result["cpu"][0].sufficient_data is False
         assert result["cpu"][0].confidence_label == "Insufficient data"
+
+    def test_filtered_recovery_uses_raw_boundaries(self):
+        """When a recovery CP is filtered out, raw boundaries still bound the window."""
+        df = pd.DataFrame({
+            "cpu": [10.0, 10.0, 10.0, 10.0, 10.0,
+                    20.0, 20.0, 20.0, 20.0, 20.0,
+                    10.0, 10.0, 10.0, 10.0, 10.0],
+        })
+        filtered_cps = {"cpu": [_make_cp("cpu", 5)]}
+        raw_cps = {"cpu": [_make_cp("cpu", 5), _make_cp("cpu", 10)]}
+        result = compute_confidence(
+            cnsts.EDIVISIVE, df, filtered_cps,
+            raw_change_points_by_metric=raw_cps,
+        )
+        conf = result["cpu"][0]
+        assert conf.mean_before == pytest.approx(10.0)
+        assert conf.mean_after == pytest.approx(20.0)
+        assert conf.sample_size_before == 5
+        assert conf.sample_size_after == 5
+
+    def test_filtered_recovery_without_raw_boundaries_dilutes(self):
+        """Without raw boundaries, a filtered recovery dilutes the shift."""
+        df = pd.DataFrame({
+            "cpu": [10.0, 10.0, 10.0, 10.0, 10.0,
+                    20.0, 20.0, 20.0, 20.0, 20.0,
+                    10.0, 10.0, 10.0, 10.0, 10.0],
+        })
+        filtered_cps = {"cpu": [_make_cp("cpu", 5)]}
+        result = compute_confidence(cnsts.EDIVISIVE, df, filtered_cps)
+        conf = result["cpu"][0]
+        assert conf.sample_size_after == 10
+        assert conf.mean_after == pytest.approx(15.0)
+
+    def test_cmr_original_dataframe_preserves_before_stats(self):
+        """CMR with original (uncollapsed) dataframe preserves before-segment stats."""
+        df = pd.DataFrame({
+            "cpu": [10.0, 10.5, 9.8, 20.0],
+        })
+        cps = {"cpu": [_make_cp("cpu", 3)]}
+        result = compute_confidence(cnsts.CMR, df, cps)
+        conf = result["cpu"][0]
+        assert conf.sample_size_before == 3
+        assert conf.sample_size_after == 1
+        assert conf.mean_before == pytest.approx(np.mean([10.0, 10.5, 9.8]))
+        assert conf.std_before is not None
+        assert conf.sufficient_data is False

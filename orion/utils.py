@@ -870,7 +870,7 @@ def generate_tabular_output(data: list, metric_name: str, uuid_field: str = "uui
                 "%Y-%m-%dT%H:%M:%SZ"
             ),
             metric_name: record["metrics"][metric_name]["value"],
-            "is_changepoint": bool(record["metrics"][metric_name]["percentage_change"]),
+            "is_changepoint": record["metrics"][metric_name].get("is_changepoint", False),
             "percentage_change": f"{record['metrics'][metric_name]['percentage_change']:.2f}%",
         }
         conf = record["metrics"][metric_name].get("confidence")

@@ -44,27 +44,24 @@ class ConfidenceResult: # pylint: disable=too-many-instance-attributes
 
 
 def _map_label(p_value, cohens_d):
-    """Map p-value and Cohen's d to a human-readable confidence label.
+    """Map Cohen's d to a human-readable effect-size label.
 
-    Cohen's d drives the label tier (effect size); p-value is reported
-    as descriptive context but does not gate the classification.
+    Cohen's d drives the label tier. p-value is included as
+    descriptive context only — it is NOT calibrated for post-selection
+    inference (the changepoint was selected from this same data).
     """
     if cohens_d is None:
         return "Degenerate variance — shift detected but effect size undefined"
 
     d_str = f"{cohens_d:.2f}"
-    p_str = f"{p_value:.2g}"
-    base = f"Negligible shift (d={d_str}, p={p_str})"
+    p_str = f"{p_value:.2g}" if p_value is not None else "n/a"
     if cohens_d >= 0.8:
-        base = f"Large shift (d={d_str}, p={p_str})"
-    elif cohens_d >= 0.5:
-        base = f"Moderate shift (d={d_str}, p={p_str})"
-    elif cohens_d >= 0.2:
-        base = f"Small shift (d={d_str}, p={p_str})"
-
-    if p_value >= 0.05:
-        return f"{base} — Not statistically significant"
-    return base
+        return f"Large shift (d={d_str}, p={p_str})"
+    if cohens_d >= 0.5:
+        return f"Moderate shift (d={d_str}, p={p_str})"
+    if cohens_d >= 0.2:
+        return f"Small shift (d={d_str}, p={p_str})"
+    return f"Negligible shift (d={d_str}, p={p_str})"
 
 
 def _get_segments(algorithm_name, data, changepoint_index,
@@ -113,9 +110,7 @@ def _compute_stats(before, after):
         p_value = None
         cohens_d = None
     elif pooled_std == 0:
-        _, p_value = stats.ttest_ind(before, after, equal_var=False)
-        if math.isnan(p_value):
-            p_value = 1.0
+        p_value = 1.0
         cohens_d = 0.0
     else:
         _, p_value = stats.ttest_ind(before, after, equal_var=False)
@@ -153,8 +148,13 @@ def _compute_stats(before, after):
     )
 
 
-def compute_confidence(algorithm_name, dataframe, change_points_by_metric):
+def compute_confidence(algorithm_name, dataframe, change_points_by_metric,
+                       raw_change_points_by_metric=None):
     """Compute confidence indicators for all changepoints.
+
+    raw_change_points_by_metric: unfiltered detector boundaries. When
+    provided, segment boundaries are derived from ALL detector-found
+    changepoints so that a filtered recovery still bounds the window.
 
     Returns dict keyed by metric name, index-aligned with
     change_points_by_metric.
@@ -188,17 +188,19 @@ def compute_confidence(algorithm_name, dataframe, change_points_by_metric):
             continue
 
         data = dataframe[metric].values
-        cp_indices = sorted(cp.index for cp in cps)
+        raw_cps = (raw_change_points_by_metric or {}).get(metric, cps)
+        all_boundaries = sorted(set(cp.index for cp in raw_cps))
 
         metric_results = []
         for cp in cps:
-            sorted_pos = cp_indices.index(cp.index)
-            prev_boundary = cp_indices[sorted_pos - 1] if sorted_pos > 0 else 0
-            next_boundary = (
-                cp_indices[sorted_pos + 1]
-                if sorted_pos < len(cp_indices) - 1
-                else len(data)
-            )
+            prev_boundary = 0
+            next_boundary = len(data)
+            for b in all_boundaries:
+                if b < cp.index:
+                    prev_boundary = b
+                elif b > cp.index:
+                    next_boundary = b
+                    break
             before, after = _get_segments(
                 algorithm_name, data, cp.index, prev_boundary, next_boundary
             )

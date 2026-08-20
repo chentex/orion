@@ -371,7 +371,7 @@ setup() {
     exit 1
   fi
 
-  CHANGEPOINTS=$(grep -c '"is_changepoint": true' ./outputs/results-anomaly_olm-integration-test.json)
+  CHANGEPOINTS=$(grep -c '"is_changepoint": true$' ./outputs/results-anomaly_olm-integration-test.json)
   if [ "$CHANGEPOINTS" -ne 3 ]; then
     echo "Expected 3 changepoints, found $CHANGEPOINTS in ./outputs/results-anomaly_olm-integration-test.json"
     exit 1
