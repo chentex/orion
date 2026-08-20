@@ -2,7 +2,6 @@
 
 # pylint: disable = line-too-long
 import pandas as pd
-import numpy
 
 from otava.analysis import TTestStats
 from otava.series import  ChangePoint
@@ -77,14 +76,19 @@ class CMR(Algorithm):
         change_points_by_metric={ k:[] for k in metric_columns }
 
         for column in metric_columns:
+            try:
+                m1 = float(dataframe_list[column][0])
+                m2 = float(dataframe_list[column][1])
+            except (ValueError, TypeError):
+                continue
 
             change_point = ChangePoint(metric=column,
                                 index=1,
                                 qhat=0.0,
                                 time=0,
                                 stats=TTestStats(
-                                        mean_1=dataframe_list[column][0],
-                                        mean_2=dataframe_list[column][1],
+                                        mean_1=m1,
+                                        mean_2=m2,
                                         std_1=0.0,
                                         std_2=0.0,
                                         pvalue=1.0
@@ -113,15 +117,17 @@ class CMR(Algorithm):
 
         metric_columns = list(dataFrame.columns)
         for column in metric_columns:
-
-            if isinstance(dF.loc[0, column], (numpy.float64, numpy.int64)):
-                mean = dF[column].mean()
-                data2[column] = [mean]
-            else:
-                column_list = dF[column].tolist()
-                # Convert each item to string to handle lists, UUIDs, and other non-string types
-                non_numeric_joined_list = ','.join(str(item) for item in column_list)
-                data2[column] = [non_numeric_joined_list]
+            try:
+                numeric_col = pd.to_numeric(dF[column])
+                data2[column] = [numeric_col.mean()]
+            except (ValueError, TypeError):
+                numeric_col = pd.to_numeric(dF[column], errors='coerce')
+                if numeric_col.notna().any():
+                    data2[column] = [numeric_col.mean()]
+                else:
+                    column_list = dF[column].tolist()
+                    non_numeric_joined_list = ','.join(str(item) for item in column_list)
+                    data2[column] = [non_numeric_joined_list]
             i += 1
         df2 = pd.DataFrame(data2)
 
