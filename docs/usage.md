@@ -52,6 +52,26 @@ orion --cmr
 - If more than 1 previous run is found, values are averaged together
 - Use with `direction: 0` in config when using `-o json` to see percent differences for both increases and decreases (default is `direction: 1` which only shows increases)
 
+### Original E-Divisive Analysis
+Uses the original E-Divisive changepoint detection method from apache-otava:
+```bash
+orion --orig-analyze
+```
+
+Unlike the default Hunter-based algorithm (`--hunter-analyze`), which applies a
+sliding-window heuristic to prune changepoints, `--orig-analyze` runs the classic
+E-Divisive statistical test directly. This makes it better suited for:
+
+- **Short time series** where the Hunter window (minimum 5 points on each side)
+  may discard valid changepoints near the edges.
+- **Scenarios where early changepoints matter** — the original algorithm treats
+  all changepoints equally regardless of position, so window-expansion logic is
+  skipped entirely.
+
+When in doubt, start with `--hunter-analyze` (the default). Switch to
+`--orig-analyze` if you suspect the sliding-window heuristic is masking
+genuine regressions in short or edge-heavy data.
+
 ### Anomaly Detection
 Detects anomalies in your data:
 ```bash
