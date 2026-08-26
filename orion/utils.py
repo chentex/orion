@@ -640,7 +640,10 @@ class Utils:
                 lambda uuid: shortened.get(uuid, buildUrls[uuid])
             )
         # Print PRs at the end, since they include commas and confuse other tools
-        merged_df.loc[:, "prs"] = merged_df[self.uuid_field].apply(lambda uuid: prs[uuid])
+        if len(prs) > 0:
+            merged_df.loc[:, "prs"] = merged_df[self.uuid_field].apply(
+                lambda uuid: prs.get(uuid, [])
+            )
 
         merged_df = merged_df.reset_index(drop=True)
         # save the dataframe
