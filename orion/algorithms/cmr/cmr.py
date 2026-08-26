@@ -110,20 +110,28 @@ class CMR(Algorithm):
             pd.Dataframe: data frame of most recent run and averaged previous runs
         """
         last_row = dataFrame.tail(1)
-        dF = dataFrame[:-1]
-        data2 = {}
+        baseline_runs = dataFrame[:-1]
 
-        metric_keys = set(self.metrics_config.keys())
-        for column in dataFrame.columns:
-            if column in metric_keys:
-                numeric_col = pd.to_numeric(dF[column], errors='coerce')
-                if numeric_col.notna().any():
-                    data2[column] = [numeric_col.mean()]
-                else:
-                    data2[column] = [float('nan')]
-            else:
-                data2[column] = [','.join(str(v) for v in dF[column].tolist())]
-        df2 = pd.DataFrame(data2)
+        # Preserve metadata from the most recent baseline run.
+        baseline_data = {
+            column: [baseline_runs[column].iloc[-1]]
+            for column in dataFrame.columns
+        }
 
-        result = pd.concat([df2, last_row], ignore_index=True)
+        # Average only configured metrics across the baseline runs.
+        for column in self.metrics_config:
+            if column not in baseline_runs.columns:
+                continue
+
+            numeric_col = pd.to_numeric(
+                baseline_runs[column], errors='coerce'
+            )
+            baseline_data[column] = [
+                numeric_col.mean()
+                if numeric_col.notna().any()
+                else float('nan')
+            ]
+
+        baseline_row = pd.DataFrame(baseline_data)
+        result = pd.concat([baseline_row, last_row], ignore_index=True)
         return result

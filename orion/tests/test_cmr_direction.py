@@ -77,8 +77,8 @@ def test_cmr_filters_wrong_direction():
 
 
 def test_cmr_preserves_metadata_columns():
-    """combine_and_average_runs should only average metric columns,
-    not metadata like ocpVersion which can be coerced to numeric."""
+    """CMR should average metrics while preserving metadata from the
+    most recent baseline run."""
     metrics_config = {
         "metric_up": {
             "direction": 1, "labels": [], "threshold": 0,
@@ -89,6 +89,12 @@ def test_cmr_preserves_metadata_columns():
         "uuid": ["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
         "ocpVersion": ["4.17", "4.18", "4.19", "4.20"],
         "timestamp": [1700000000, 1700100000, 1700200000, 1700300000],
+        "buildUrl": [
+            "http://build1",
+            "http://build2",
+            "http://build3",
+            "http://build4",
+        ],
         "metric_up": [10.0, 10.5, 9.8, 20.0],
     })
     test = _make_test_config()
@@ -99,12 +105,18 @@ def test_cmr_preserves_metadata_columns():
     )
     result = algorithm.combine_and_average_runs(df)
     assert len(result) == 2
-    baseline_version = result.iloc[0]["ocpVersion"]
-    assert "4.17" in baseline_version
-    assert "4.18" in baseline_version
-    assert "4.19" in baseline_version
-    assert result.iloc[0]["metric_up"] == pytest.approx(10.1)
-    assert result.iloc[1]["ocpVersion"] == "4.20"
+
+    baseline = result.iloc[0]
+    assert baseline["uuid"] == "uuid-3"
+    assert baseline["ocpVersion"] == "4.19"
+    assert baseline["timestamp"] == 1700200000
+    assert baseline["buildUrl"] == "http://build3"
+    assert baseline["metric_up"] == pytest.approx(10.1)
+    assert pd.api.types.is_numeric_dtype(result["timestamp"])
+
+    current = result.iloc[1]
+    assert current["uuid"] == "uuid-4"
+    assert current["ocpVersion"] == "4.20"
 
 
 def test_cmr_keeps_direction_zero():
