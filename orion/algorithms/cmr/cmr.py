@@ -109,26 +109,20 @@ class CMR(Algorithm):
         Returns:
             pd.Dataframe: data frame of most recent run and averaged previous runs
         """
-        i = 0
-
         last_row = dataFrame.tail(1)
         dF = dataFrame[:-1]
         data2 = {}
 
-        metric_columns = list(dataFrame.columns)
-        for column in metric_columns:
-            try:
-                numeric_col = pd.to_numeric(dF[column])
-                data2[column] = [numeric_col.mean()]
-            except (ValueError, TypeError):
+        metric_keys = set(self.metrics_config.keys())
+        for column in dataFrame.columns:
+            if column in metric_keys:
                 numeric_col = pd.to_numeric(dF[column], errors='coerce')
                 if numeric_col.notna().any():
                     data2[column] = [numeric_col.mean()]
                 else:
-                    column_list = dF[column].tolist()
-                    non_numeric_joined_list = ','.join(str(item) for item in column_list)
-                    data2[column] = [non_numeric_joined_list]
-            i += 1
+                    data2[column] = [float('nan')]
+            else:
+                data2[column] = [','.join(str(v) for v in dF[column].tolist())]
         df2 = pd.DataFrame(data2)
 
         result = pd.concat([df2, last_row], ignore_index=True)

@@ -1,6 +1,8 @@
 # pylint: disable=missing-class-docstring,missing-function-docstring
 """Tests for confidence indicators module."""
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -208,6 +210,18 @@ class TestComputeStats:
         after = np.array([100.0, 100.0, 100.0])
         result = _compute_stats(before, after)
         assert result.cohens_d == 0.0
+
+    def test_one_segment_zero_variance_no_scipy_warning(self):
+        before = np.array([100.0, 100.0, 100.0, 100.0, 100.0])
+        after = np.array([200.0, 201.0, 199.0, 200.5, 200.2])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result = _compute_stats(before, after)
+        assert result.sufficient_data is True
+        assert result.p_value is not None
+        assert result.p_value < 0.05
+        assert result.cohens_d is not None
+        assert result.cohens_d > 0.8
 
     def test_sample_sizes_recorded(self):
         before = np.array([1.0, 2.0, 3.0])

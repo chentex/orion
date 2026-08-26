@@ -322,7 +322,7 @@ Labels are driven by Cohen's d effect size thresholds (Cohen 1988: 0.2 small, 0.
 
 | Label | Meaning |
 |-------|---------|
-| `Large shift (d=1.20, p=0.001)` | d >= 0.8 — strong evidence of a meaningful metric shift |
+| `Large shift (d=1.20, p=0.001)` | d >= 0.8 — large observed standardized contrast |
 | `Moderate shift (d=0.60, p=0.03)` | 0.5 <= d < 0.8 — moderate-magnitude shift |
 | `Small shift (d=0.30, p=0.02)` | 0.2 <= d < 0.5 — small but detectable effect |
 | `Negligible shift (d=0.10, p=0.01)` | d < 0.2 — negligible practical impact |
@@ -437,7 +437,7 @@ When generating reports from JSON files with `--report`, confidence data is prop
 
 Use confidence indicators to triage changepoints for evidence of meaningful metric shifts:
 
-1. **Large shift** — investigate immediately; strong evidence of a meaningful metric shift
+1. **Large shift** — investigate immediately; large observed standardized contrast
 2. **Moderate shift** — investigate; meaningful shift that warrants attention
 3. **Small shift** — detectable but small; may be acceptable depending on the metric's sensitivity
 4. **Negligible shift** — the detected change is too small to matter in practice

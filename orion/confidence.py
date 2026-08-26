@@ -112,6 +112,17 @@ def _compute_stats(before, after):
     elif pooled_std == 0:
         p_value = 1.0
         cohens_d = 0.0
+    elif std_before == 0 or std_after == 0:
+        se = math.sqrt(std_before ** 2 / n_before + std_after ** 2 / n_after)
+        t_stat = abs(mean_after - mean_before) / se
+        if std_before == 0:
+            welch_df = n_after - 1
+        else:
+            welch_df = n_before - 1
+        p_value = float(2 * stats.t.sf(t_stat, welch_df))
+        cohens_d = abs(mean_after - mean_before) / pooled_std
+        if math.isnan(p_value):
+            p_value = 1.0
     else:
         _, p_value = stats.ttest_ind(before, after, equal_var=False)
         cohens_d = abs(mean_after - mean_before) / pooled_std
