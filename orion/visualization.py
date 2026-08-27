@@ -27,6 +27,7 @@ class VizData:  # pylint: disable=too-few-public-methods,too-many-instance-attri
         uuid_field: str,
         version_field: str,
         acked_entries: list = None,
+        algorithm_name: str = ""
     ):
         self.test_name = test_name
         self.dataframe = dataframe
@@ -34,6 +35,7 @@ class VizData:  # pylint: disable=too-few-public-methods,too-many-instance-attri
         self.change_points_by_metric = change_points_by_metric
         self.uuid_field = uuid_field
         self.version_field = version_field
+        self.algorithm_name = algorithm_name
         self.acked_entries = acked_entries or []
 
 
@@ -99,6 +101,42 @@ def _classify_changepoints(change_points_by_metric, metrics_config):
     return result
 
 
+def _metric_has_data(df, metric_name):
+    """Check if a metric column exists in the dataframe and has non-NaN values."""
+    return metric_name in df.columns and df[metric_name].notna().any()
+
+
+def _add_no_data_placeholder(fig, metric_name, row_idx):
+    """Add a 'No data available' annotation to an empty subplot."""
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode="markers",
+            showlegend=False,
+            hoverinfo="skip",
+        ),
+        row=row_idx, col=1,
+    )
+    fig.add_annotation(
+        text="No data available",
+        x=0.5, y=0.5,
+        xref=f"x{row_idx} domain" if row_idx > 1 else "x domain",
+        yref=f"y{row_idx} domain" if row_idx > 1 else "y domain",
+        showarrow=False,
+        font={"color": "rgba(255,255,255,0.4)", "size": 16},
+    )
+    fig.update_yaxes(
+        title_text=metric_name,
+        title_font={"size": 11},
+        gridcolor="rgba(255,255,255,0.08)",
+        row=row_idx, col=1,
+    )
+    fig.update_xaxes(
+        showticklabels=False,
+        row=row_idx, col=1,
+    )
+
+
 def _build_test_figure(viz_data: VizData) -> go.Figure:
     """Build a plotly Figure for a single test with one subplot per metric."""
     df = viz_data.dataframe
@@ -150,6 +188,10 @@ def _build_test_figure(viz_data: VizData) -> go.Figure:
     ]
 
     for row_idx, metric_name in enumerate(metrics, start=1):
+        if not _metric_has_data(df, metric_name):
+            _add_no_data_placeholder(fig, metric_name, row_idx)
+            continue
+
         values = df[metric_name]
         line_color = line_colors[(row_idx - 1) % len(line_colors)]
 
@@ -191,19 +233,91 @@ def _build_test_figure(viz_data: VizData) -> go.Figure:
             col=1,
         )
 
-        # Mean line
+        # Statistical reference lines and shaded bands
         mean_val = values.mean()
+        std_val = values.std() if values.count() >= 2 else 0.0
+        p99_val = values.quantile(0.99)
+
+        if std_val > 0:
+            # ±2σ shaded band (wider, subtler shade)
+            fig.add_hrect(
+                y0=mean_val - 2 * std_val,
+                y1=mean_val + 2 * std_val,
+                fillcolor="rgba(255, 68, 68, 0.07)",
+                line_width=0,
+                layer="below",
+                row=row_idx, col=1,
+            )
+            # ±1σ shaded band (narrower, slightly more visible)
+            fig.add_hrect(
+                y0=mean_val - std_val,
+                y1=mean_val + std_val,
+                fillcolor="rgba(255, 170, 0, 0.10)",
+                line_width=0,
+                layer="below",
+                row=row_idx, col=1,
+            )
+
+            # ±2σ boundary lines (red dotted)
+            fig.add_hline(
+                y=mean_val + 2 * std_val, row=row_idx, col=1,
+                line_dash="dot", line_color="rgba(255,68,68,0.5)",
+                line_width=1,
+                annotation_text=f"+2σ ({mean_val + 2 * std_val:,.2f})",
+                annotation_position="right",
+                annotation_font_color="rgba(255,68,68,0.7)",
+                annotation_font_size=8,
+            )
+            fig.add_hline(
+                y=mean_val - 2 * std_val, row=row_idx, col=1,
+                line_dash="dot", line_color="rgba(255,68,68,0.5)",
+                line_width=1,
+                annotation_text=f"-2σ ({mean_val - 2 * std_val:,.2f})",
+                annotation_position="right",
+                annotation_font_color="rgba(255,68,68,0.7)",
+                annotation_font_size=8,
+            )
+
+            # ±1σ boundary lines (orange dash-dot)
+            fig.add_hline(
+                y=mean_val + std_val, row=row_idx, col=1,
+                line_dash="dashdot", line_color="rgba(255,170,0,0.6)",
+                line_width=1,
+                annotation_text=f"+1σ ({mean_val + std_val:,.2f})",
+                annotation_position="right",
+                annotation_font_color="rgba(255,170,0,0.7)",
+                annotation_font_size=8,
+            )
+            fig.add_hline(
+                y=mean_val - std_val, row=row_idx, col=1,
+                line_dash="dashdot", line_color="rgba(255,170,0,0.6)",
+                line_width=1,
+                annotation_text=f"-1σ ({mean_val - std_val:,.2f})",
+                annotation_position="right",
+                annotation_font_color="rgba(255,170,0,0.7)",
+                annotation_font_size=8,
+            )
+
+        # Mean line (green dashed)
         fig.add_hline(
-            y=mean_val,
-            row=row_idx,
-            col=1,
-            line_dash="dot",
-            line_color="rgba(255,255,255,0.3)",
-            line_width=1,
-            annotation_text=f"avg: {mean_val:,.0f}",
+            y=mean_val, row=row_idx, col=1,
+            line_dash="dash", line_color="rgba(57,255,20,0.6)",
+            line_width=1.5,
+            annotation_text=f"AVG ({mean_val:,.2f})",
             annotation_position="right",
-            annotation_font_color="rgba(255,255,255,0.5)",
+            annotation_font_color="rgba(57,255,20,0.8)",
             annotation_font_size=9,
+        )
+
+        # P99 line (cyan long-dash)
+        fig.add_hline(
+            y=p99_val, row=row_idx, col=1,
+            line_dash="longdash", line_color="rgba(0,212,255,0.5)",
+            line_width=1,
+            annotation_text=f"P99 ({p99_val:,.2f})",
+            annotation_position="right",
+            annotation_font_color="rgba(0,212,255,0.7)",
+            annotation_font_size=8,
         )
 
         # Changepoint markers and annotations
@@ -306,8 +420,8 @@ def _build_test_figure(viz_data: VizData) -> go.Figure:
         # Add consistent y-axis padding so all subplots look similar.
         # For nearly-flat metrics, ensure at least 5% of the mean as padding
         # so the data fills the subplot instead of being a thin line.
-        y_min = values.min()
-        y_max = values.max()
+        y_min = min(values.min(), mean_val - 2 * std_val)
+        y_max = max(values.max(), mean_val + 2 * std_val)
         y_span = y_max - y_min
         min_pad = abs(mean_val) * 0.05 or 1
         y_pad = max(y_span * 0.15, min_pad)
@@ -396,7 +510,7 @@ def _build_test_figure(viz_data: VizData) -> go.Figure:
             "font_size": 12,
             "font_color": "#ffffff",
         },
-        margin={"t": 160, "b": 40, "l": 80, "r": 40},
+        margin={"t": 160, "b": 40, "l": 80, "r": 120},
         autosize=True,
     )
 
@@ -429,6 +543,160 @@ def _build_test_figure(viz_data: VizData) -> go.Figure:
     return fig
 
 
+def _build_cmr_figure(viz_data: VizData) -> go.Figure:
+    """Build a bar comparison figure for CMR (2-row baseline vs latest)."""
+    df = viz_data.dataframe
+    metrics = list(viz_data.metrics_config.keys())
+    n_metrics = len(metrics)
+
+    if n_metrics == 0 or len(df) < 2:
+        fig = go.Figure()
+        label = "no metrics" if n_metrics == 0 else "insufficient data"
+        fig.update_layout(
+            title_text=f"Orion: {viz_data.test_name} ({label})",
+            template="plotly_dark",
+            paper_bgcolor="#1a1a2e",
+            plot_bgcolor="#16213e",
+        )
+        return fig
+
+    versions = df.get(viz_data.version_field, pd.Series(["N/A"] * len(df)))
+    baseline_label = f"Baseline ({_short_version(versions.iloc[0])})"
+    latest_label = f"Latest ({_short_version(versions.iloc[-1])})"
+
+    fig = make_subplots(
+        rows=n_metrics,
+        cols=1,
+        shared_xaxes=False,
+        subplot_titles=metrics,
+        vertical_spacing=80 / (300 * n_metrics + 100),
+    )
+
+    for row_idx, metric_name in enumerate(metrics, start=1):
+        if (
+            not _metric_has_data(df, metric_name)
+            or pd.isna(df[metric_name].iloc[0])
+            or pd.isna(df[metric_name].iloc[-1])
+        ):
+            _add_no_data_placeholder(fig, metric_name, row_idx)
+            continue
+
+        baseline_val = float(df[metric_name].iloc[0])
+        latest_val = float(df[metric_name].iloc[-1])
+
+        if baseline_val == 0:
+            pct_change = None
+        else:
+            pct_change = ((latest_val - baseline_val) / baseline_val) * 100
+
+        direction = viz_data.metrics_config.get(
+            metric_name, {}
+        ).get("direction", 1)
+        if pct_change is not None:
+            is_regression = (pct_change * direction > 0) or direction == 0
+        else:
+            is_regression = False
+
+        latest_color = "#ff4444" if is_regression else "#39ff14"
+
+        fig.add_trace(
+            go.Bar(
+                x=[baseline_label],
+                y=[baseline_val],
+                name="Baseline",
+                marker_color="#00d4ff",
+                showlegend=(row_idx == 1),
+                text=[f"{baseline_val:,.2f}"],
+                textposition="outside",
+                textfont={"color": "#00d4ff", "size": 12},
+                hovertemplate=(
+                    f"<b>{metric_name}</b><br>"
+                    f"Baseline: {baseline_val:,.2f}"
+                    "<extra></extra>"
+                ),
+            ),
+            row=row_idx,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Bar(
+                x=[latest_label],
+                y=[latest_val],
+                name="Latest",
+                marker_color=latest_color,
+                showlegend=(row_idx == 1),
+                text=[f"{latest_val:,.2f}"],
+                textposition="outside",
+                textfont={"color": latest_color, "size": 12},
+                hovertemplate=(
+                    f"<b>{metric_name}</b><br>"
+                    f"Latest: {latest_val:,.2f}<br>"
+                    f"Change: {pct_change:+.1f}%"
+                    if pct_change is not None else
+                    f"<b>{metric_name}</b><br>"
+                    f"Latest: {latest_val:,.2f}<br>"
+                    "Change: N/A (zero baseline)"
+                ) + "<extra></extra>",
+            ),
+            row=row_idx,
+            col=1,
+        )
+
+        pct_color = "#ff4444" if is_regression else "#39ff14"
+        pct_label = f"{pct_change:+.1f}%" if pct_change is not None else "N/A"
+        y_top = max(baseline_val, latest_val)
+        fig.add_annotation(
+            x=latest_label,
+            y=y_top,
+            text=f"<b>{pct_label}</b>",
+            showarrow=False,
+            font={"color": pct_color, "size": 14},
+            yshift=30,
+            row=row_idx,
+            col=1,
+        )
+
+        y_pad = max(abs(baseline_val), abs(latest_val)) * 0.25 or 1
+        fig.update_yaxes(
+            title_text=metric_name,
+            title_font={"size": 11},
+            gridcolor="rgba(255,255,255,0.08)",
+            range=[0, max(baseline_val, latest_val) + y_pad],
+            row=row_idx,
+            col=1,
+        )
+
+    title = (
+        f"<b>Orion CMR: {viz_data.test_name}</b><br>"
+        f"<span style='font-size:12px; color:#aaa'>"
+        f"Baseline vs Latest | {n_metrics} metrics</span>"
+    )
+
+    fig.update_layout(
+        title_text=title,
+        title_x=0.5,
+        barmode="group",
+        height=300 * n_metrics + 100,
+        showlegend=True,
+        legend={"orientation": "h", "yanchor": "bottom",
+                "y": 1.02, "xanchor": "center", "x": 0.5},
+        template="plotly_dark",
+        paper_bgcolor="#1a1a2e",
+        plot_bgcolor="#16213e",
+        hoverlabel={
+            "bgcolor": "#1e1e3a",
+            "bordercolor": "#666",
+            "font_size": 12,
+            "font_color": "#ffffff",
+        },
+        margin={"t": 120, "b": 40, "l": 80, "r": 40},
+        autosize=True,
+    )
+
+    return fig
+
+
 def generate_test_html(viz_data: VizData, output_file: str) -> str:
     """Generate a self-contained HTML file for one test.
 
@@ -441,7 +709,10 @@ def generate_test_html(viz_data: VizData, output_file: str) -> str:
     """
     logger = SingletonLogger.get_logger("Orion")
 
-    fig = _build_test_figure(viz_data)
+    if viz_data.algorithm_name == "cmr":
+        fig = _build_cmr_figure(viz_data)
+    else:
+        fig = _build_test_figure(viz_data)
     fig.write_html(
         output_file, include_plotlyjs="cdn", full_html=True,
         default_width="100%",

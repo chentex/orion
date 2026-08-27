@@ -394,6 +394,7 @@ def analyze(test, kwargs, is_pull=False):
             change_points_by_metric=viz_change_points,
             uuid_field=test["uuid_field"],
             version_field=test["version_field"],
+            algorithm_name=algorithm_name,
             acked_entries=acked_entries,
         )
 
