@@ -414,8 +414,9 @@ def test_filter_runs(matcher_instance, monkeypatch):
     assert result == expected
 
 
-def test_filter_runs_empty_data(matcher_instance):
-    result = matcher_instance.filter_runs([], [])
+def test_filter_runs_empty_historical_data(matcher_instance):
+    data = [{"uuid": "uuid1", "jobConfig": {"jobIterations": 1}}]
+    result = matcher_instance.filter_runs([], data)
     assert result == []
 
 
