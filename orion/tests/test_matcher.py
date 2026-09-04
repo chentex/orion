@@ -414,6 +414,11 @@ def test_filter_runs(matcher_instance, monkeypatch):
     assert result == expected
 
 
+def test_filter_runs_empty_data(matcher_instance):
+    result = matcher_instance.filter_runs([], [])
+    assert result == []
+
+
 @pytest.mark.parametrize(
     "fixture_name,test_uuid,test_uuids,test_metrics,fake_hits,expected",
     [

@@ -249,6 +249,9 @@ class Matcher:
         columns = [self.uuid_field, "jobConfig.jobIterations"]
         pdf = pd.json_normalize(pdata)
         pick_df = pd.DataFrame(pdf, columns=columns)
+        if pick_df.empty:
+            self.logger.warning("No historical runs found for comparison — skipping filter")
+            return []
         iterations = pick_df.iloc[0]["jobConfig.jobIterations"]
         df = pd.json_normalize(data)
         ndf = pd.DataFrame(df, columns=columns)
