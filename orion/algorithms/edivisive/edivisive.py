@@ -49,10 +49,11 @@ class EDivisive(Algorithm):
 
         # filter by direction and ack'ed issues
         for metric, changepoint_list in change_points_by_metric.items():
+            is_dry_run = self.metrics_config[metric].get("dryRun", False)
             for i in range(len(changepoint_list)-1, -1, -1):
                 deleted = False
                 if (self._has_changepoint(metric, changepoint_list, i) or
-                    self._is_acked(ackSet, metric, changepoint_list, i) or
+                    (not is_dry_run and self._is_acked(ackSet, metric, changepoint_list, i)) or
                     self._is_under_threshold(metric, changepoint_list, i)):
                     deleted=True
                     del changepoint_list[i]

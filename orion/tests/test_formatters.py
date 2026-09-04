@@ -145,6 +145,90 @@ class TestExtractRegressionData:
 
         assert regressions[0]["benchmark_type"] == "node-density"
 
+    def test_dry_run_flag_propagated_in_regression_data(self):
+        df = pd.DataFrame({
+            "uuid": ["uuid-1", "uuid-2", "uuid-3"],
+            "ocpVersion": ["4.18", "4.19", "4.20"],
+            "timestamp": [1700000000, 1700100000, 1700200000],
+            "buildUrl": ["http://b1", "http://b2", "http://b3"],
+            "prs": [None, None, None],
+            "cpu": [10.0, 20.0, 30.0],
+        })
+        series = Series(
+            test_name="test",
+            branch=None,
+            time=[1700000000, 1700100000, 1700200000],
+            metrics={"cpu": Metric(1, 1.0)},
+            data={"cpu": df["cpu"]},
+            attributes={
+                "uuid": df["uuid"],
+                "ocpVersion": df["ocpVersion"],
+            },
+        )
+        data = AnalysisResult(
+            test_name="test-workload",
+            test={
+                "name": "test-workload",
+                "uuid_field": "uuid",
+                "version_field": "ocpVersion",
+                "metadata": {"benchmark.keyword": "node-density"},
+            },
+            dataframe=df,
+            metrics_config={
+                "cpu": {"direction": 1, "labels": [], "threshold": 0,
+                        "correlation": "", "context": None, "dryRun": True},
+            },
+            change_points_by_metric={"cpu": [make_change_point("cpu", index=2)]},
+            series=series,
+            regression_flag=True,
+            avg_values=pd.Series({"cpu": 20.0}),
+            collapse=False,
+            display_fields=[],
+            column_group_size=5,
+            uuid_field="uuid",
+            version_field="ocpVersion",
+            sippy_pr_search=False,
+            github_repos=[],
+        )
+
+        class ConcreteFormatter(BaseFormatter):
+            def format(self, data):
+                return {}
+            def format_average(self, data):
+                return ""
+            def save(self, test_name, formatted, save_output_path):
+                pass
+            def print_output(self, test_name, formatted, data, pr=0, is_pull=False):
+                pass
+            def print_and_save_pr(self, periodic, pulls, save_output_path):
+                pass
+
+        formatter = ConcreteFormatter()
+        regressions = formatter.extract_regression_data(data)
+
+        assert len(regressions) == 1
+        assert regressions[0]["metrics_with_change"][0]["dryRun"] is True
+
+    def test_dry_run_default_false_when_not_set(self):
+        data = _make_analysis_result()
+
+        class ConcreteFormatter(BaseFormatter):
+            def format(self, data):
+                return {}
+            def format_average(self, data):
+                return ""
+            def save(self, test_name, formatted, save_output_path):
+                pass
+            def print_output(self, test_name, formatted, data, pr=0, is_pull=False):
+                pass
+            def print_and_save_pr(self, periodic, pulls, save_output_path):
+                pass
+
+        formatter = ConcreteFormatter()
+        regressions = formatter.extract_regression_data(data)
+
+        assert regressions[0]["metrics_with_change"][0]["dryRun"] is False
+
 
 class TestJsonFormatter:
     def test_format_produces_valid_json(self):

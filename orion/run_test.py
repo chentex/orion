@@ -397,6 +397,20 @@ def analyze(test, kwargs, is_pull=False):
             acked_entries=acked_entries,
         )
 
+    if regression_flag:
+        has_only_dry_run = all(
+            metrics_config.get(metric, {}).get("dryRun", False)
+            for metric, cps in change_points_by_metric.items()
+            if cps
+        )
+        if has_only_dry_run:
+            logger.info(
+                "All changepoints are from dry-run metrics; "
+                "suppressing regression flag for test=%s",
+                test["name"],
+            )
+            regression_flag = False
+
     if iforest_nan_configs:
         for col, cfg in iforest_nan_configs.items():
             final_algorithm.dataframe[col] = float("nan")

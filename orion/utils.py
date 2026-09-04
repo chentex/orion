@@ -63,6 +63,7 @@ class Utils:
         agg_metrics = []
         std_metrics = []
         meta_by_name = {}
+        config_errors = []
 
         seen_names = set()
         for metric in metrics:
@@ -83,19 +84,39 @@ class Utils:
             ts = metric.pop("timestamp", global_timestamp_field)
             correlation = metric.pop("correlation", "")
             context = metric.pop("context", 5)
+            dry_run = metric.pop("dryRun", False)
+            if not isinstance(dry_run, bool):
+                config_errors.append(
+                    f"Metric '{name}' has dryRun={dry_run!r} "
+                    f"(type {type(dry_run).__name__}), expected a boolean."
+                )
+                dry_run = False
             metric.pop("group_by", None)
             metric_type = metric.get("type")
 
             meta_by_name[metric["name"]] = {
                 "labels": labels, "direction": direction, "threshold": threshold,
                 "correlation": correlation, "context": context, "timestamp": ts,
-                "type": metric_type,
+                "type": metric_type, "dryRun": dry_run,
             }
 
             if "agg" in metric:
                 agg_metrics.append(metric)
             else:
                 std_metrics.append(metric)
+
+        for name, meta in meta_by_name.items():
+            target = meta["correlation"]
+            if target and target in meta_by_name and meta_by_name[target].get("dryRun", False):
+                config_errors.append(
+                    f"Metric '{name}' uses correlation '{target}', "
+                    f"but '{target}' has dryRun enabled. "
+                    f"Dry-run metrics cannot be used as correlation targets."
+                )
+        if config_errors:
+            raise ValueError(
+                "Metric configuration errors:\n  - " + "\n  - ".join(config_errors)
+            )
 
         if agg_metrics:
             for ts_field, group in self._group_by_timestamp(agg_metrics, meta_by_name):
@@ -123,6 +144,7 @@ class Utils:
         metric["timestamp"] = meta["timestamp"]
         metric["correlation"] = meta["correlation"]
         metric["context"] = meta["context"]
+        metric["dryRun"] = meta["dryRun"]
 
     @staticmethod
     def _group_by_timestamp(metrics, meta_by_name):

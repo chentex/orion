@@ -311,6 +311,7 @@ correlation: <metric_name>
 - Correlation is applied in order - set dependent metrics before their depending metrics
 - Each correlation metric can only be in one correlation relation
 - Config validation will fail if metrics appear in more than one relation
+- Dry-run metrics (`dryRun: true`) cannot be used as correlation targets — config validation will reject this
 - This feature hides changepoint detections based on metric relationships - analyze results carefully
 
 ### Context
@@ -359,6 +360,47 @@ In this example, `kubeBurnerVersion` fetches the `k8sVersion` field from `jobSum
 - They are excluded from `metrics_config`, so algorithms skip them during analysis
 - They are included as **attributes** in the output series, appearing in report tables alongside UUID and version columns
 - The `direction`, `threshold`, `labels`, and `correlation` fields are ignored for metadata metrics (they can be omitted)
+
+## Dry-Run Metrics
+
+Metrics can be marked with `dryRun: true` to evaluate them in a safe, non-blocking mode. When a metric is marked as dry-run, Orion still executes the comparison, evaluates the threshold, and reports the results as usual. However, it suppresses any disruptive failure actions:
+
+- **No non-zero exit code** — Dry-run regressions do not cause `exit 2`. If all detected regressions come from dry-run metrics, Orion exits with `0`.
+- **No JIRA ticket creation** — Dry-run metrics are skipped during automatic JIRA issue creation (`--jira-auto-create`).
+- **No ACK filtering** — Dry-run metrics bypass acknowledgment matching, so their changepoints are always reported regardless of existing ACK entries.
+
+This is useful for introducing new or experimental metrics, tuning thresholds, or canary-testing metric definitions without the risk of breaking pipelines or generating noisy alerts.
+
+### Usage
+
+Add `dryRun: true` to any metric definition:
+
+```yaml
+metrics:
+  - name: experimentalMetric
+    metricName.keyword: myExperimentalMetric
+    metric_of_interest: value
+    direction: 1
+    threshold: 10
+    dryRun: true
+
+  - name: stableMetric
+    metricName.keyword: myStableMetric
+    metric_of_interest: value
+    direction: 1
+    threshold: 5
+```
+
+In this example, `experimentalMetric` is evaluated and its changepoints appear in the output, but a regression on it alone will not fail the pipeline or create a JIRA ticket. The `stableMetric` behaves normally — a regression on it will trigger exit code `2` and JIRA creation if enabled.
+
+### Behavior
+
+- Dry-run metrics use the same query fields and analysis pipeline as regular metrics
+- Direction filtering and threshold checks still apply — only the failure actions are suppressed
+- When mixed with regular metrics, only the non-dry-run regressions determine the exit code
+- Defaults to `false` if not specified — all existing metrics are unaffected
+- Dry-run metrics cannot be used as correlation targets — a metric with `dryRun: true` cannot appear in another metric's `correlation` field
+- The `dryRun` value must be a boolean (`true` or `false`)
 
 ## Aggregation Metrics
 
