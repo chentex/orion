@@ -84,10 +84,10 @@ class Utils:
             ts = metric.pop("timestamp", global_timestamp_field)
             correlation = metric.pop("correlation", "")
             context = metric.pop("context", 5)
-            dry_run = metric.pop("dryRun", False)
+            dry_run = metric.pop("dry_run", False)
             if not isinstance(dry_run, bool):
                 config_errors.append(
-                    f"Metric '{name}' has dryRun={dry_run!r} "
+                    f"Metric '{name}' has dry_run={dry_run!r} "
                     f"(type {type(dry_run).__name__}), expected a boolean."
                 )
                 dry_run = False
@@ -97,7 +97,7 @@ class Utils:
             meta_by_name[metric["name"]] = {
                 "labels": labels, "direction": direction, "threshold": threshold,
                 "correlation": correlation, "context": context, "timestamp": ts,
-                "type": metric_type, "dryRun": dry_run,
+                "type": metric_type, "dry_run": dry_run,
             }
 
             if "agg" in metric:
@@ -107,10 +107,10 @@ class Utils:
 
         for name, meta in meta_by_name.items():
             target = meta["correlation"]
-            if target and target in meta_by_name and meta_by_name[target].get("dryRun", False):
+            if target and target in meta_by_name and meta_by_name[target].get("dry_run", False):
                 config_errors.append(
                     f"Metric '{name}' uses correlation '{target}', "
-                    f"but '{target}' has dryRun enabled. "
+                    f"but '{target}' has dry_run enabled. "
                     f"Dry-run metrics cannot be used as correlation targets."
                 )
         if config_errors:
@@ -144,7 +144,7 @@ class Utils:
         metric["timestamp"] = meta["timestamp"]
         metric["correlation"] = meta["correlation"]
         metric["context"] = meta["context"]
-        metric["dryRun"] = meta["dryRun"]
+        metric["dry_run"] = meta["dry_run"]
 
     @staticmethod
     def _group_by_timestamp(metrics, meta_by_name):

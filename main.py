@@ -199,7 +199,7 @@ def auto_create_jira_issues(regression_data: list, provider: AckProvider, logger
             if not metric_name:
                 continue
 
-            if metric_info.get("dryRun", False):
+            if metric_info.get("dry_run", False):
                 logger.info(
                     "Skipping JIRA creation for dry-run metric: %s",
                     metric_name,

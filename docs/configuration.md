@@ -311,7 +311,7 @@ correlation: <metric_name>
 - Correlation is applied in order - set dependent metrics before their depending metrics
 - Each correlation metric can only be in one correlation relation
 - Config validation will fail if metrics appear in more than one relation
-- Dry-run metrics (`dryRun: true`) cannot be used as correlation targets — config validation will reject this
+- Dry-run metrics (`dry_run: true`) cannot be used as correlation targets — config validation will reject this
 - This feature hides changepoint detections based on metric relationships - analyze results carefully
 
 ### Context
@@ -363,7 +363,7 @@ In this example, `kubeBurnerVersion` fetches the `k8sVersion` field from `jobSum
 
 ## Dry-Run Metrics
 
-Metrics can be marked with `dryRun: true` to evaluate them in a safe, non-blocking mode. When a metric is marked as dry-run, Orion still executes the comparison, evaluates the threshold, and reports the results as usual. However, it suppresses any disruptive failure actions:
+Metrics can be marked with `dry_run: true` to evaluate them in a safe, non-blocking mode. When a metric is marked as dry-run, Orion still executes the comparison, evaluates the threshold, and reports the results as usual. However, it suppresses any disruptive failure actions:
 
 - **No non-zero exit code** — Dry-run regressions do not cause `exit 2`. If all detected regressions come from dry-run metrics, Orion exits with `0`.
 - **No JIRA ticket creation** — Dry-run metrics are skipped during automatic JIRA issue creation (`--jira-auto-create`).
@@ -373,7 +373,7 @@ This is useful for introducing new or experimental metrics, tuning thresholds, o
 
 ### Usage
 
-Add `dryRun: true` to any metric definition:
+Add `dry_run: true` to any metric definition:
 
 ```yaml
 metrics:
@@ -382,7 +382,7 @@ metrics:
     metric_of_interest: value
     direction: 1
     threshold: 10
-    dryRun: true
+    dry_run: true
 
   - name: stableMetric
     metricName.keyword: myStableMetric
@@ -399,8 +399,8 @@ In this example, `experimentalMetric` is evaluated and its changepoints appear i
 - Direction filtering and threshold checks still apply — only the failure actions are suppressed
 - When mixed with regular metrics, only the non-dry-run regressions determine the exit code
 - Defaults to `false` if not specified — all existing metrics are unaffected
-- Dry-run metrics cannot be used as correlation targets — a metric with `dryRun: true` cannot appear in another metric's `correlation` field
-- The `dryRun` value must be a boolean (`true` or `false`)
+- Dry-run metrics cannot be used as correlation targets — a metric with `dry_run: true` cannot appear in another metric's `correlation` field
+- The `dry_run` value must be a boolean (`true` or `false`)
 
 ## Aggregation Metrics
 

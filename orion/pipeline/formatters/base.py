@@ -65,8 +65,8 @@ class BaseFormatter(ABC):
                                 "percentage_change": percentage_change,
                                 "labels": data.metrics_config[metric].get(
                                     "labels") or [],
-                                "dryRun": data.metrics_config[metric].get(
-                                    "dryRun", False),
+                                "dry_run": data.metrics_config[metric].get(
+                                    "dry_run", False),
                             })
                             self._add_confidence(
                                 data, metric, cp_idx,
@@ -96,7 +96,7 @@ class BaseFormatter(ABC):
                         "value": row.get(metric),
                         "percentage_change": percentage_change,
                         "labels": data.metrics_config[metric].get("labels") or [],
-                        "dryRun": data.metrics_config[metric].get("dryRun", False),
+                        "dry_run": data.metrics_config[metric].get("dry_run", False),
                     }],
                     "prs": [],
                     "github_context": None,

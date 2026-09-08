@@ -399,7 +399,7 @@ def analyze(test, kwargs, is_pull=False):
 
     if regression_flag:
         has_only_dry_run = all(
-            metrics_config.get(metric, {}).get("dryRun", False)
+            metrics_config.get(metric, {}).get("dry_run", False)
             for metric, cps in change_points_by_metric.items()
             if cps
         )

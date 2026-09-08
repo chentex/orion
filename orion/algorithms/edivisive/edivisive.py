@@ -49,7 +49,7 @@ class EDivisive(Algorithm):
 
         # filter by direction and ack'ed issues
         for metric, changepoint_list in change_points_by_metric.items():
-            is_dry_run = self.metrics_config[metric].get("dryRun", False)
+            is_dry_run = self.metrics_config[metric].get("dry_run", False)
             for i in range(len(changepoint_list)-1, -1, -1):
                 deleted = False
                 if (self._has_changepoint(metric, changepoint_list, i) or

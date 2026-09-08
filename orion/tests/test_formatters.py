@@ -176,7 +176,7 @@ class TestExtractRegressionData:
             dataframe=df,
             metrics_config={
                 "cpu": {"direction": 1, "labels": [], "threshold": 0,
-                        "correlation": "", "context": None, "dryRun": True},
+                        "correlation": "", "context": None, "dry_run": True},
             },
             change_points_by_metric={"cpu": [make_change_point("cpu", index=2)]},
             series=series,
@@ -207,7 +207,7 @@ class TestExtractRegressionData:
         regressions = formatter.extract_regression_data(data)
 
         assert len(regressions) == 1
-        assert regressions[0]["metrics_with_change"][0]["dryRun"] is True
+        assert regressions[0]["metrics_with_change"][0]["dry_run"] is True
 
     def test_dry_run_default_false_when_not_set(self):
         data = _make_analysis_result()
@@ -227,7 +227,7 @@ class TestExtractRegressionData:
         formatter = ConcreteFormatter()
         regressions = formatter.extract_regression_data(data)
 
-        assert regressions[0]["metrics_with_change"][0]["dryRun"] is False
+        assert regressions[0]["metrics_with_change"][0]["dry_run"] is False
 
 
 class TestJsonFormatter:
